@@ -62,6 +62,12 @@ function parse_line(line)
 	
 	elseif line:sub(1,2) == "LD" then
 		output = parse_ldx(line);
+		
+	elseif line:sub(1,3) == "BRA" then
+		table.insert(output, 0x60)
+		table.insert(output, 0x00)
+		table.insert(output, 0x00)
+		table.insert(output, 0x00)
 	end
 	
 	hexline = ""
@@ -82,8 +88,11 @@ function parse_ldx( line )
 	table.insert(output, 0x70) -- fixed for the ldx function for now
 	
 	-- for now just immediate loading
-	num_start_index = string.find(line, "#")
+	num_start_index = string.find(line, "%$") -- <- dollar sign is a "magic char" in lua so we must use % to escape it(!!)
 	numstring = line:sub(num_start_index+1)
+	
+	print(numstring)
+	
 	num = tonumber(numstring, 16)
 	
 	table.insert(output, num)
@@ -118,4 +127,35 @@ function trim_line( line )
 	end
 	
 	return line
+end
+
+-- raw data to be dumped into the file!
+function parse_db( line )
+	output = {}
+	
+	-- dollar sign indicates the hex digits (this could be expanded to do other types of data too like binary '%' and strings? "'")
+	next_dolla_index = 0;
+	while next_dolla_index ~= nil do
+	
+		next_dolla_index = string.find(line, "%$");
+		if next_dolla_index == nil then return output end
+		
+		line = line:sub(next_dolla_index + 1)
+		
+		-- the numerical data is sandwiched between the dolla and the comma
+		-- (or if there is no comma, then it's the last item defo)
+		next_comma_index = string.find(line, ",");
+		if next_comma_index == nil then
+			numstring = line
+		else
+			numstring = line:sub(0, next_comma_index - 1)
+		end
+		print(numstring)
+		
+		num = tonumber(numstring, 16)
+		table.insert(output, num)
+	
+	end
+	
+	return output
 end
