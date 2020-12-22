@@ -23,9 +23,7 @@ function assemble(path)
 	-- a table of byte arrays, each array corresponding to a line of assembly
 	output_lines = {};
 	
-	-- first one is string and second one is number
-	--label_names = {};
-	--label_values = {};
+	-- hashmap
 	labels = {};
 	
 	-- keeps track of how many bytes each line corresponds to, for calculating the value of each label
@@ -53,19 +51,6 @@ function assemble(path)
 	
 	end
 	
-		-- BRA (branch always)
-		-- if output_lines[i][1] == 0x60 then
-		
-			-- labeladdr = 0
-			-- for i = 1, #bytes_per_line do
-			
-				-- labeladdr = labeladdr + bytes_per_line[i]
-		
-			-- end
-		
-		
-		-- end
-	
 	-- FINAL WRITE TO SNDH
 	
 	outputfile = io.open("file.sndh", "wb")
@@ -88,8 +73,6 @@ function parse_for_branches(line, line_number)
 
 	line = string.upper(line) -- so that, for example, RTS and rts both work
 	line = trim_line(line)
-
-	--print(line)
 	
 	-- branch always
 	if line:sub(1,3) == "BRA" then
@@ -173,6 +156,9 @@ function parse_line(line, line_number)
 	elseif line:sub(1,2) == "LD" then
 		output = parse_ldx(line);
 		
+	elseif line:sub(1,2) == "ST" then
+		output = parse_stx(line);
+		
 	elseif line:sub(1,3) == "BRA" then
 		table.insert(output, 0x60)
 		table.insert(output, 0x00)
@@ -202,14 +188,32 @@ function parse_ldx( line )
 	-- for now just immediate loading
 	num_start_index = string.find(line, "%$") -- <- dollar sign is a "magic char" in lua so we must use % to escape it(!!)
 	numstring = line:sub(num_start_index+1)
-	
 	print(numstring)
 	
 	num = tonumber(numstring, 16)
-	
 	table.insert(output, num)
+	
 	return output
+end
 
+function parse_stx( line )
+
+	output = {}
+	table.insert(output, 0x13)
+	table.insert(output, 0xc0)
+	table.insert(output, 0x00)
+	
+	num_start_index = string.find(line, "%$")
+	numstring = line:sub(num_start_index+1)
+	print(numstring)
+	
+	num = tonumber(numstring, 16)
+	print(num)
+	table.insert(output, math.floor((num / 256) / 256))
+	table.insert(output, (num / 256) % 256)
+	table.insert(output, (num % 256))
+	
+	return output
 end
 
 -- gets rid of the junk before and after
