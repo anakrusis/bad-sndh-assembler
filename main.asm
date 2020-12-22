@@ -16,6 +16,6 @@ snd_exit:
 
 	rts
 	
-snd_vblank
+snd_vblank:
 
 	rts

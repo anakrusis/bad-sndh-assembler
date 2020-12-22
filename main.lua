@@ -1,3 +1,6 @@
+-- Bad .SNDH Assembler by amelia fafafafafafafafafafafafafa
+-- i hope this is well commented enough! im coming back to it after abandoning it for a month and it seems pretty legible still...
+
 function love.load()
 
 	assemble("bad-sndh-assembler/main.asm")
@@ -19,17 +22,25 @@ function assemble(path)
 	-- keeps track of how many bytes each line corresponds to, for calculating the value of each label
 	bytes_per_line = {};
 	
+	-- FIRST PASS
 	i = 1
 	line = 1
 	while line ~= nil do
 		line = file:read "*line"
 		if line == nil then break end
 		
-		output_lines[i] = parse_line(line);
+		output_lines[i] = parse_line(line, i);
+		bytes_per_line[i] = #output_lines[i];
 		i = i + 1;
 	end
 	
-	outputfile = io.open("file.bin", "wb")
+	-- TODO SECOND PASS (branches are given proper offsets based on the labels)
+	
+	
+	
+	-- FINAL WRITE TO SNDH
+	
+	outputfile = io.open("file.sndh", "wb")
 	for i = 1, #output_lines do
 	
 		for j = 1, #output_lines[i] do
@@ -44,7 +55,7 @@ end
 
 -- returns an array of bytes to be written directly to the file
 
-function parse_line(line)
+function parse_line(line, line_number)
 	
 	-- the byte array, empty for now
 	output = {};
@@ -52,6 +63,29 @@ function parse_line(line)
 	line = string.upper(line) -- so that, for example, RTS and rts both work
 	line = trim_line(line)
 	print(line)
+	
+	-- the first part of the label jumping system is finding labels which are the only thing in this assembly dialect to use colons
+	-- if a label is found then its name is added to the list of labels.
+	colonindex = string.find(line, ":")
+	if colonindex ~= nil then
+		
+		labelstring = line:sub(1, colonindex-1)
+		
+		table.insert(label_names, labelstring);
+		
+		-- now the byte address of the label is calculated here. starts at zero and counts all the bytes before it.
+		labeladdr = 0
+		for i = 1, #bytes_per_line do
+			
+			labeladdr = labeladdr + bytes_per_line[i]
+		
+		end
+		
+		print("Label found " .. labelstring .. " at address " .. labeladdr );
+		
+		-- bypasses everything else, returns an empty table. the label doesnt correspond to any hex code.
+		return output;
+	end
 	
 	if line:sub(1,3) == "RTS" then -- RTS in hex: 4375
 		table.insert(output, 0x43)
@@ -68,6 +102,8 @@ function parse_line(line)
 		table.insert(output, 0x00)
 		table.insert(output, 0x00)
 		table.insert(output, 0x00)
+		
+		-- TODO second pass will replace the branch of 0000 with the proper amount
 	end
 	
 	hexline = ""
