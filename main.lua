@@ -7,17 +7,26 @@ function love.load()
 
 end
 
+function love.update(dt)
+end
+
+function love.draw()
+end
+
 function assemble(path)
 
-	print("Assembling " .. path)
+	print("Assembling " .. path .. "\n")
 	file = io.open (path, "r")
 	
+	-- just a table of strings
+	input_lines = {};
 	-- a table of byte arrays, each array corresponding to a line of assembly
 	output_lines = {};
 	
-	-- a pair of parallel indexes
-	label_names = {};
-	label_values = {};
+	-- first one is string and second one is number
+	--label_names = {};
+	--label_values = {};
+	labels = {};
 	
 	-- keeps track of how many bytes each line corresponds to, for calculating the value of each label
 	bytes_per_line = {};
@@ -29,14 +38,33 @@ function assemble(path)
 		line = file:read "*line"
 		if line == nil then break end
 		
-		output_lines[i] = parse_line(line, i);
+		input_lines[i]    = line;
+		output_lines[i]   = parse_line(line, i);
 		bytes_per_line[i] = #output_lines[i];
+		
 		i = i + 1;
 	end
 	
-	-- TODO SECOND PASS (branches are given proper offsets based on the labels)
+	-- SECOND PASS (branches are given proper offsets based on the labels)
 	
+	for i = 1, #input_lines do
 	
+		parse_for_branches( input_lines[i], i );
+	
+	end
+	
+		-- BRA (branch always)
+		-- if output_lines[i][1] == 0x60 then
+		
+			-- labeladdr = 0
+			-- for i = 1, #bytes_per_line do
+			
+				-- labeladdr = labeladdr + bytes_per_line[i]
+		
+			-- end
+		
+		
+		-- end
 	
 	-- FINAL WRITE TO SNDH
 	
@@ -53,6 +81,50 @@ function assemble(path)
 	outputfile:close()
 end
 
+-- meat of the second pass, scanning for all branches and calculating the offsets
+-- returns void, just modifying the existing output_lines based on the state of input_lines
+
+function parse_for_branches(line, line_number)
+
+	line = string.upper(line) -- so that, for example, RTS and rts both work
+	line = trim_line(line)
+
+	--print(line)
+	
+	-- branch always
+	if line:sub(1,3) == "BRA" then
+	
+		-- matches the name of the label to the item in the labels map to get its byte address
+		labelname = line:sub(5)
+		labeladdr = labels[labelname]
+		print ("Branch to label " .. labelname .. " at addr " .. labeladdr);
+		
+		
+		branchaddr = 0
+		for i = 1, line_number-1 do
+			
+			branchaddr = branchaddr + bytes_per_line[i]
+		
+		end
+		branchaddr = branchaddr + 2 -- adding on 2 because the 16-bit offset begins 2 bytes after the first byte of the branch instruction
+		print("Branch at addr " .. branchaddr )
+		
+		addr_out = labeladdr - branchaddr;
+		print("Address to write: " .. addr_out);
+		
+		addr_out_unsigned = addr_out;
+		if addr_out_unsigned < 0 then
+			-- not tested yet, probably doesnt work just saying
+			addr_out_unsigned = 0-(((-1 - addr_out_unsigned) % 2^16)+1)
+			
+		end
+		
+		output_lines[line_number][3] = addr_out_unsigned / 256
+		output_lines[line_number][4] = addr_out_unsigned % 256
+	end
+end
+
+
 -- returns an array of bytes to be written directly to the file
 
 function parse_line(line, line_number)
@@ -62,6 +134,10 @@ function parse_line(line, line_number)
 	
 	line = string.upper(line) -- so that, for example, RTS and rts both work
 	line = trim_line(line)
+	
+	-- blank lines ignored
+	if line == "" then return output end
+	
 	print(line)
 	
 	-- the first part of the label jumping system is finding labels which are the only thing in this assembly dialect to use colons
@@ -71,8 +147,6 @@ function parse_line(line, line_number)
 		
 		labelstring = line:sub(1, colonindex-1)
 		
-		table.insert(label_names, labelstring);
-		
 		-- now the byte address of the label is calculated here. starts at zero and counts all the bytes before it.
 		labeladdr = 0
 		for i = 1, #bytes_per_line do
@@ -81,13 +155,15 @@ function parse_line(line, line_number)
 		
 		end
 		
-		print("Label found " .. labelstring .. " at address " .. labeladdr );
+		labels[labelstring] = labeladdr;
+		
+		print("Label found " .. labelstring .. " at address " .. labeladdr .. "\n");
 		
 		-- bypasses everything else, returns an empty table. the label doesnt correspond to any hex code.
 		return output;
 	end
 	
-	if line:sub(1,3) == "RTS" then -- RTS in hex: 4375
+	if line:sub(1,3) == "RTS" then
 		table.insert(output, 0x43)
 		table.insert(output, 0x75)
 		
@@ -186,7 +262,7 @@ function parse_db( line )
 		else
 			numstring = line:sub(0, next_comma_index - 1)
 		end
-		print(numstring)
+		--print(numstring)
 		
 		num = tonumber(numstring, 16)
 		table.insert(output, num)
