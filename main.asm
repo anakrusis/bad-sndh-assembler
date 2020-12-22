@@ -6,7 +6,9 @@
 	bra snd_vblank
 
 .db $53, $4e, $44, $48      ; SNDH
-.db $54, $43, $34, $39, $00 ; TC49
+;.db $54, $43, $34, $39, $00 ; TC49
+.db $54, $49, $4d, $45      ; TIME
+.db $00, $15, $00          
 .db $48, $44, $4e, $53, $00 ; HDNS
 
 snd_init:
@@ -26,7 +28,7 @@ snd_init:
 	; highest
 	ld0 #$0f
 	st0 $ff8802
-	
+
 	; select register 0 (ch1 freq)
 	ld0 #$00
 	st0 $ff8800
@@ -41,5 +43,12 @@ snd_exit:
 	rts
 	
 snd_vblank:
+
+	; select register 0 (ch1 freq)
+	ld0 #$00
+	st0 $ff8800
+	
+	ld0 #$e0
+	st0 $ff8802
 	
 	rts
